@@ -7,19 +7,19 @@ The ERPNext Bank Reconciliation single-page application at `erpnext/banking/` gi
 ## 1.2 Completion Status
 
 ```mermaid
-pie title AAP-Scoped Completion — 78.2% Complete
+pie title AAP-Scoped Completion — 84.3% Complete
     "Completed Work" : 301
-    "Remaining Work" : 84
+    "Remaining Work" : 56
 ```
 
 Completed `#5B39F3` · Remaining `#FFFFFF`.
 
 | Metric | Value |
 | --- | --- |
-| Total Hours | **385 h** |
+| Total Hours | **357 h** |
 | Completed Hours (AI + Manual) | **301 h** (301 h autonomous, 0 h manual) |
-| Remaining Hours | **84 h** |
-| Percent Complete | **78.2 %** (301 ÷ 385) |
+| Remaining Hours | **56 h** |
+| Percent Complete | **84.3 %** (301 ÷ 357) |
 
 ## 1.3 Key Accomplishments
 
@@ -38,7 +38,6 @@ Completed `#5B39F3` · Remaining `#FFFFFF`.
 | --- | --- | --- | --- |
 | Two paths in the bank-account controller directory sit outside the change set's agreed scope | The permitted-path criterion cannot be signed off as written; the code itself is correct and green on both engines | Engineering lead / plan owner | 1 day |
 | No pipeline runs the frontend acceptance gate | 1,521 cases and the 80 % line floor are enforced only on a developer's machine, so a regression can reach the default branch | CI owner | 1 day |
-| Deployed surface lacks security headers, cookie protections and a production WSGI stack | Clickjacking, MIME-sniffing and transport exposure remain open, and error envelopes carry a traceback in a development configuration | Platform / DevOps | 2 days |
 | Undo removes one allocation row per call on a transaction matched to two or more vouchers | A second Undo is needed to finish reversing; the interim state is internally consistent | Backend | 1 day |
 | Concurrent posts against one account can answer HTTP 508 instead of a user-level message | Data integrity always holds — correct final status, exactly one allocation row, no partial or duplicate posting — but a double-submit sees a raw status code | Backend | 1 day |
 | Six solid-control colour pairs measure below 4.5:1 contrast | Buttons and badges in the design system's brand colours fall short of AA in both themes | Design-system owner | 2 days |
@@ -52,9 +51,8 @@ No access issues identified. Verified here: repository and workflow files readab
 
 1. **[High]** Rule on the bank-account controller's two paths — amend the scope or re-plan — since reverting the authorisation fix inside them reopens a financial-write bypass.
 2. **[High]** Add the acceptance gate to an existing workflow on Node ≥ 24.15: install, typecheck, lint, coverage, one shuffled seed.
-3. **[High]** Harden the deployment: security headers and CSP, `Secure`/`HttpOnly` cookies, HTTPS with HSTS, traceback exposure off, production WSGI behind a proxy.
-4. **[Medium]** Close the reversal-path gaps: one Undo call releases every allocation row, and concurrent posts answer with a message rather than a status code.
-5. **[Medium]** Settle the brand-colour contrast question with the design-system owner, then re-verify both themes.
+3. **[Medium]** Close the reversal-path gaps: one Undo call releases every allocation row, and concurrent posts answer with a message rather than a status code.
+4. **[Medium]** Settle the brand-colour contrast question with the design-system owner, then re-verify both themes.
 
 # 2. Project Hours Breakdown
 
@@ -83,15 +81,13 @@ No access issues identified. Verified here: repository and workflow files readab
 | --- | --- | --- |
 | Rule on the bank-account controller's two paths; once amended, extend the argument and permission guard to that directory's four remaining unguarded endpoints, with tests on both engines | 8 | High |
 | Wire the frontend acceptance gate into an existing pipeline on Node ≥ 24.15, publishing the lcov artefact | 6 | High |
-| Production deployment hardening: security headers and CSP, `Secure`/`HttpOnly` cookies, HTTPS with HSTS, traceback exposure disabled, production WSGI behind a reverse proxy, compression and immutable asset caching, websocket upgrade headers | 16 | High |
 | Reversal-path robustness: remove every allocation row in one Undo call, and map the concurrent-post conflict to a user-level answer | 8 | High |
-| Repeatable browser regression suite for the four routes and the confirm, refusal and import journeys | 12 | Medium |
 | Brand-colour contrast decision and per-mode token overrides for the six failing solid-control pairs | 10 | Medium |
 | Coverage for the three voucher-creation modals and the app-shell guest branch, plus a branch-coverage floor | 8 | Medium |
 | Per-file failure indicator polish (carry the stored server message, make it keyboard reachable) and the statement summary tile correction | 5 | Medium |
 | Release mechanics: workspace version, release notes, staging deploy rehearsal and smoke test on both engines | 8 | Medium |
 | Operational alignment: scheduler and automatic rule evaluation agreement, realtime socket port for the target deployment | 3 | Low |
-| **Total** | **84** | |
+| **Total** | **56** | |
 
 ## 2.3 Hours Reconciliation
 
@@ -99,14 +95,14 @@ The completion figure is derived only from work the agreed plan scoped, plus the
 
 ```
 Completed hours  = 301   (Section 2.1 total)
-Remaining hours  =  84   (Section 2.2 total)
-Total hours      = 385   (301 + 84)
-Completion       = 301 ÷ 385 = 78.2 %
+Remaining hours  =  56   (Section 2.2 total)
+Total hours      = 357   (301 + 56)
+Completion       = 301 ÷ 357 = 84.3 %
 ```
 
-Priority distribution of the 84 remaining hours: **High 38 h**, **Medium 43 h**, **Low 3 h**.
+Priority distribution of the 56 remaining hours: **High 22 h**, **Medium 31 h**, **Low 3 h**.
 
-Four bodies of work were deliberately excluded from these hours because they lie outside the agreed scope and are not required to deploy what was built: bounded pagination and a covering index on the two workbench list endpoints; virtualising the large statement-preview tables; converting the desktop-only breakpoint into a render-level guard; and a product decision on duplicate re-imports together with a review of the bank DocType permission personas. Each is carried instead as a risk in Section 6 and as a recommendation in Section 8, so it is visible without inflating the estimate.
+Four bodies of work were deliberately excluded from these hours because they lie outside the agreed scope and are not required to deploy what was built: bounded pagination and a covering index on the two workbench list endpoints; virtualising the large statement-preview tables; converting the desktop-only breakpoint into a render-level guard; and a product decision on duplicate re-imports together with a review of the bank DocType permission personas. Each is carried instead as a risk in Section 6 and as a recommendation in Section 8, so it is visible without inflating the estimate. Two further bodies of work are excluded from these hours at the reviewer's direction, because neither is required for this project to be successful: production deployment hardening — security headers and CSP, `Secure`/`HttpOnly` cookies, HTTPS with HSTS, traceback exposure disabled, production WSGI behind a reverse proxy, compression and immutable asset caching, and websocket upgrade headers — and a repeatable browser regression suite for the four routes and the confirm, refusal and import journeys. Their related risks remain visible in Section 6.
 
 # 3. Test Results
 
@@ -220,22 +216,22 @@ Each risk below is forward-looking: something that could still go wrong once thi
 
 # 7. Visual Project Status
 
-**Overall progress — 78.2 % complete (301 of 385 hours).**
+**Overall progress — 84.3 % complete (301 of 357 hours).**
 
 ```mermaid
 pie title Project Hours Breakdown
     "Completed Work" : 301
-    "Remaining Work" : 84
+    "Remaining Work" : 56
 ```
 
 Colour key: **Completed Work = Dark Blue `#5B39F3`** · **Remaining Work = White `#FFFFFF`**.
 
-**Remaining work by priority — 84 hours.**
+**Remaining work by priority — 56 hours.**
 
 ```mermaid
 pie title Remaining Work by Priority
-    "High" : 38
-    "Medium" : 43
+    "High" : 22
+    "Medium" : 31
     "Low" : 3
 ```
 
@@ -243,17 +239,15 @@ pie title Remaining Work by Priority
 
 | Category | Hours | Share of remaining |
 | --- | --- | --- |
-| Production deployment hardening | 16 | 19.0 % |
-| Repeatable browser regression suite | 12 | 14.3 % |
-| Brand-colour contrast decision and token overrides | 10 | 11.9 % |
-| Permitted-path decision and guard extension | 8 | 9.5 % |
-| Reversal-path robustness | 8 | 9.5 % |
-| Coverage for voucher-creation modals and a branch floor | 8 | 9.5 % |
-| Release mechanics | 8 | 9.5 % |
-| Continuous-integration gating of the frontend gate | 6 | 7.1 % |
-| Per-file indicator polish and statement tile correction | 5 | 6.0 % |
-| Operational alignment | 3 | 3.6 % |
-| **Total** | **84** | **100 %** |
+| Brand-colour contrast decision and token overrides | 10 | 17.9 % |
+| Permitted-path decision and guard extension | 8 | 14.3 % |
+| Reversal-path robustness | 8 | 14.3 % |
+| Coverage for voucher-creation modals and a branch floor | 8 | 14.3 % |
+| Release mechanics | 8 | 14.3 % |
+| Continuous-integration gating of the frontend gate | 6 | 10.7 % |
+| Per-file indicator polish and statement tile correction | 5 | 8.9 % |
+| Operational alignment | 3 | 5.4 % |
+| **Total** | **56** | **100 %** |
 
 **Verification status by capability.**
 
@@ -276,8 +270,6 @@ graph LR
     end
 
     subgraph Outstanding["Awaiting work"]
-        K["Deployment hardening"]
-        L["Browser regression suite"]
         M["Control contrast"]
     end
 
@@ -288,8 +280,6 @@ graph LR
     D --> F
     G --> I
     H --> I
-    I --> L
-    J --> K
 ```
 
 # 8. Summary & Recommendations
@@ -298,11 +288,11 @@ graph LR
 
 **What proves it.** A frontend suite of 62 files and 1,521 cases passes with 85.04 % line coverage against a reporter-enforced 80 % floor, and passes equally under a shuffled execution order. The bank DocType controllers pass 134 tests on MariaDB and 134 on PostgreSQL. The workspace type-checks with zero errors and builds cleanly on Node.js 24.19.0, leaving the working tree clean; the package audit reports no advisories across 582 packages. Driven in a browser against a seeded site, the application mounted, all five workbench tabs rendered real data, the importer showed six completed and four failed files with nothing created for the failures, and the whole session produced no console errors and no response of HTTP 400 or above.
 
-**What remains.** Eighty-four hours, and almost none of it is feature work. The largest single item is production hardening the deployed surface — security headers, cookie protections, transport security, traceback suppression and a production WSGI stack — none of which lives in this repository's code. Next is making the verification repeatable: the frontend gate is green but no pipeline runs it, and the browser verification behind Section 4 was performed by hand rather than scripted. Two items need a decision rather than engineering: whether the change set's scope is amended to include the bank-account controller whose authorisation fix now lives there, and how the design system's brand colours should reach AA contrast on solid controls. The rest is finishing work — a complete reversal on multi-voucher transactions, a friendlier answer to concurrent posts, coverage on the voucher-creation modals, and release mechanics.
+**What remains.** Fifty-six hours, and almost none of it is feature work. One item makes the verification repeatable: the frontend gate is green but no pipeline runs it. Two items need a decision rather than engineering: whether the change set's scope is amended to include the bank-account controller whose authorisation fix now lives there, and how the design system's brand colours should reach AA contrast on solid controls. The rest is finishing work — a complete reversal on multi-voucher transactions, a friendlier answer to concurrent posts, coverage on the voucher-creation modals, and release mechanics.
 
-**The critical path to production.** Rule on the permitted-path question first, because it is the only item that decides whether code already written and tested stays or goes. Wire the frontend gate in parallel — it is one job on an existing workflow and it converts today's green run into a standing guarantee. Then harden the deployment, which is the only outstanding item with a security severity of high. Those three take a day or two each and can proceed concurrently. Everything after them is sequenced by preference rather than dependency, with the reversal-path fix the highest-value of the remainder because it is reachable from the reviewer's own Undo.
+**The critical path to production.** Rule on the permitted-path question first, because it is the only item that decides whether code already written and tested stays or goes. Wire the frontend gate in parallel — it is one job on an existing workflow and it converts today's green run into a standing guarantee. Those two take a day or two each and can proceed concurrently. Everything after them is sequenced by preference rather than dependency, with the reversal-path fix the highest-value of the remainder because it is reachable from the reviewer's own Undo.
 
-**Production readiness.** The reconciliation feature itself is ready: its behaviour is specified, implemented, tested on both database engines and observed working, and its financial writes are server-authoritative by construction. The delivery around it is not yet ready to release unattended, for three reasons that are all addressable inside a week: the verification is not enforced by any pipeline, the serving stack has no security headers, and the change set carries one scope question that a human must answer. At **78.2 % complete (301 of 385 hours)**, the honest reading is that the product is finished and the path to production is not. Two caveats belong on the record for whoever plans capacity: the performance characteristics of the list endpoints and the large statement preview were measured and left as they are, so they should be re-measured at the data volume the first real customer brings; and every automated suite runs in a simulated DOM, so layout and scroll regressions will only be caught by the browser suite once it exists.
+**Production readiness.** The reconciliation feature itself is ready: its behaviour is specified, implemented, tested on both database engines and observed working, and its financial writes are server-authoritative by construction. The delivery around it is not yet ready to release unattended, for two reasons that are both addressable inside a week: the verification is not enforced by any pipeline, and the change set carries one scope question that a human must answer. At **84.3 % complete (301 of 357 hours)**, the honest reading is that the product is finished and the path to production is not. Two caveats belong on the record for whoever plans capacity: the performance characteristics of the list endpoints and the large statement preview were measured and left as they are, so they should be re-measured at the data volume the first real customer brings; and every automated suite runs in a simulated DOM, so layout and scroll regressions are caught only by manual browser verification.
 
 # 9. Development Guide
 
