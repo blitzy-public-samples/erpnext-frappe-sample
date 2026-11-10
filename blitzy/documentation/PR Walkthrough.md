@@ -89,7 +89,7 @@ Areas 4.2–4.4 hold production source only: every frontend `*.test.ts` and `*.t
 
 # 4. Area-by-Area Walkthrough
 
-Each subsection follows the same pattern: what changed, why, the key files, what to scrutinise, and how to verify. Frontend commands run from `erpnext/banking`; backend commands run from your bench root (`$BENCH_ROOT`) or the `erpnext` submodule root, as marked. §8 lists every file of each area.
+Each subsection follows the same pattern: what changed, why, the key files, what to scrutinise, and how to verify. Every command block starts at the superproject root and opens with the `cd` that sets its working directory: frontend blocks `cd erpnext/banking`, and backend blocks `cd` into your bench root (`$BENCH_ROOT`) or the erpnext app checkout inside it (`$BENCH_ROOT/apps/erpnext`). §4.8's block needs no `cd`, because `git -C erpnext` names the submodule itself. The shell variables these blocks read are listed at the top of §7. §8 lists every file of each area.
 
 ## 4.1 Backend — Bank DocType Controllers and Tests (10 files)
 
@@ -98,7 +98,7 @@ Each subsection follows the same pattern: what changed, why, the key files, what
 - **A shared argument guard.** `bank_transaction.py` defines `refuse_missing_arguments`, a decorator placed directly beneath `@frappe.whitelist(...)`, plus `refuse_arguments` and `refuse_unknown_bank_transaction`. It is applied to 28 whitelisted methods: 18 in `bank_reconciliation_tool.py`, 6 in `bank_statement_import_log.py`, 3 in `bank_transaction.py` and 1 in `bank_transaction_rule.py`. A missing or surplus argument becomes a `frappe.throw` validation error, and an unknown transaction a `frappe.DoesNotExistError`, instead of a raw `TypeError`, `IndexError` or `AttributeError`.
 - **`bank_transaction.py`.** `before_update_after_submit` now calls `validate_currency()`, so the reconcile path — `save()` on a submitted document — enforces the currency rule. `add_payment_entries` refuses a draft transaction before appending anything. The over-allocation message fills both of its placeholders. `unreconcile_transaction_entry` refuses ("Nothing to Undo") when the named voucher is not linked, instead of reporting success. `unreconcile_transaction` becomes POST-only.
 - **`bank_reconciliation_tool.py`.** `reconcile_vouchers` runs three new steps in order: `parse_vouchers_to_reconcile` (malformed, non-list or empty payloads refused), `load_bank_transaction_for_reconciliation` (a `for_update=True` row lock, `docstatus` and `unallocated_amount` re-read through it, refusal when `modified` has moved), and `validate_vouchers_to_reconcile` (voucher type, existence, then read permission through `filter_permitted_vouchers`) — all before `add_payment_entries`. `get_linked_payments` checks read permission on the transaction and its Bank Account, refuses an absent `document_types`, and returns only candidates that pass `filter_permitted_vouchers`; the Payment Entry candidate query gains an `orderby(pe.name)` tiebreak. `parse_date_argument` normalises the module's client-supplied dates, refusing an unreadable, blank or overflowing value. `validate_reconciliation_voucher_type` and `validate_clearance_write_permission` guard clearance-date writes. `update_clearance_date`, `clear_clearing_date` and `auto_reconcile_vouchers` become POST-only.
-- **`bank_statement_import_log.py`.** `read_statement_or_throw` wraps every third-party parser so an unreadable file is a titled refusal, logged with `frappe.log_error`. A file that parses to no rows, and a statement with no transactions to insert, are refused. Column-mapping and PDF table-region inputs are validated. The closing balance is written through the internal `_set_closing_balance_as_per_statement`.
+- **`bank_statement_import_log.py`.** `read_statement_or_throw` wraps the attachment read and the CSV, XLSX and XLS readers in `get_data`, and the attachment read, `extract_pdf_tables` and `render_pdf_pages` in `prepare_pdf_tables`: a failure there that is not already a framework exception is logged with `frappe.log_error` and refused with a titled message. PDF table re-extraction is not wrapped: `reextract_pdf_table` reads the attachment and calls `extract_table_in_bbox` (pdfplumber) directly. A file that parses to no rows, and a statement with no transactions to insert, are refused. Column-mapping and PDF table-region inputs are validated. The closing balance is written through the internal `_set_closing_balance_as_per_statement`.
 - **`bank_transaction_rule.py`.** `run_rule_evaluation` requires write rather than read permission, scopes the pass to `get_permitted_companies_for_rule_evaluation()`, coerces a string force flag with `sbool`, and enqueues with a per-mode `job_id`, `deduplicate=True` and `enqueue_after_commit=True`. `_run_rule_evaluation` takes `companies` and skips a row locked by a concurrent reconciliation (`frappe.QueryDeadlockError`) instead of failing the pass.
 - **`bank_account.py`.** `set_closing_balance_as_per_statement` authorises the caller against the named Bank Account, refuses an unknown account with `frappe.DoesNotExistError` and an unreadable date with a validation error, then delegates to `_set_closing_balance_as_per_statement`.
 - **Tests.** Every new test is additive; no existing test was removed.
@@ -131,7 +131,7 @@ Each subsection follows the same pattern: what changed, why, the key files, what
 
 **Scrutinise**
 
-- **Decorator order.** `@refuse_missing_arguments` must sit *under* `@frappe.whitelist(...)` at every one of the 28 sites, because `whitelist()` registers the object it decorates; the decorator's docstring sets out what breaks otherwise and why argument coercion is unaffected.
+- **Decorator order.** `@refuse_missing_arguments` must sit *under* `@frappe.whitelist(...)` at every one of the 28 sites, because `whitelist()` registers the object it decorates; the decorator's docstring sets out what breaks otherwise, and why argument coercion still applies to arguments passed by name, as every HTTP request passes them, but not to arguments passed positionally, as only the modules' own internal callers do.
 - **The reconcile sequence.** Confirm that `validate_vouchers_to_reconcile` runs after the transaction loads and before `add_payment_entries`, so every refusal leaves the transaction untouched.
 - **Concurrency.** The Project Guide (§1.4, §6) records that concurrent posts can answer HTTP 508. Read that against `load_bank_transaction_for_reconciliation`, which takes a row lock and maps a `QueryDeadlockError` on that read to a "Refresh Required" refusal.
 - **Permission source.** `filter_permitted_vouchers` uses `frappe.get_list`, which applies DocType and User Permissions; `frappe.get_all` would not.
@@ -142,14 +142,15 @@ Each subsection follows the same pattern: what changed, why, the key files, what
 **Verify**
 
 ```bash
-cd "$BENCH_ROOT"
+cd "${BENCH_ROOT:?Set BENCH_ROOT to your bench directory}"
 for m in bank_transaction bank_reconciliation_tool bank_transaction_rule \
          bank_statement_import_log bank_account; do
-  bench --site <site> run-tests --lightmode --module erpnext.accounts.doctype.$m.test_$m
+  bench --site "${SITE:?Set SITE to the site to test}" run-tests --lightmode --module erpnext.accounts.doctype.$m.test_$m
 done
 # Measured: 21, 46, 31, 26, 10 — 134 tests, OK, on MariaDB and again on PostgreSQL
 
-# From the erpnext submodule root: the guard count per controller (18, 6, 3, 1)
+# The guard count per controller (18, 6, 3, 1), read from the erpnext app checkout inside the bench
+cd "${BENCH_ROOT:?Set BENCH_ROOT to your bench directory}/apps/erpnext"
 grep -c '^@refuse_missing_arguments' erpnext/accounts/doctype/bank_*/bank_*.py
 ```
 
@@ -529,7 +530,13 @@ The table restates Project Guide §5.2 rows 1–8 and points to where each shows
 
 # 7. How to Verify Locally
 
-The commands are host-independent: substitute your own bench root and site names. The workspace README, `erpnext/banking/README.md`, and Project Guide §9 carry the longer runbook.
+Each block starts at the directory its `cd` or heading names: §7.1, §7.3 and §7.4 start at the superproject root, and the bench blocks (§7.2 and §4.1) `cd` into `$BENCH_ROOT` themselves. Set these shell variables first; a block that reads one stops with a message naming it when it is unset:
+
+- `BENCH_ROOT` — the absolute path to a bench whose `apps/erpnext` is this PR's erpnext checkout.
+- `MARIADB_SITE` and `POSTGRES_SITE` — a site with erpnext installed on each engine; §4.1 takes one site as `SITE`.
+- `FRAPPE_SEMGREP_RULES` — the absolute path to a checkout of Frappe's semgrep rule set.
+
+The workspace README, `erpnext/banking/README.md`, and Project Guide §9 carry the longer runbook.
 
 ## 7.1 Frontend Gate — No Bench Required
 
@@ -546,8 +553,9 @@ Every install prints the `Resolution field "ws@8.21.2" is incompatible…` warni
 ## 7.2 Backend Tests — Both Engines
 
 ```bash
-cd "$BENCH_ROOT"
-for site in <mariadb-site> <postgres-site>; do
+cd "${BENCH_ROOT:?Set BENCH_ROOT to your bench directory}"
+for site in "${MARIADB_SITE:?Set MARIADB_SITE to your MariaDB site}" \
+            "${POSTGRES_SITE:?Set POSTGRES_SITE to your PostgreSQL site}"; do
   for m in bank_transaction bank_reconciliation_tool bank_transaction_rule \
            bank_statement_import_log bank_account; do
     bench --site "$site" run-tests --lightmode --module erpnext.accounts.doctype.$m.test_$m
@@ -557,7 +565,7 @@ done
 
 Run the modules one at a time per site; concurrent runs against one site hit table locks.
 
-## 7.3 Backend Static Gates — From the `erpnext` Submodule Root
+## 7.3 Backend Static Gates — From the Superproject Root
 
 ```bash
 cd erpnext
@@ -565,12 +573,12 @@ ruff check erpnext/accounts/doctype/bank_*
 ruff check --select=I erpnext/accounts/doctype/bank_*
 ruff format --check erpnext/accounts/doctype/bank_*
 semgrep --metrics=off --error --config=semgrep/test-correctness.yml erpnext/accounts/doctype/bank_*
-semgrep --metrics=off --error --config <frappe-semgrep-rules>/rules --config r/python.lang.correctness \
+semgrep --metrics=off --error --config "${FRAPPE_SEMGREP_RULES:?Set FRAPPE_SEMGREP_RULES to a checkout of the Frappe semgrep rules}/rules" --config r/python.lang.correctness \
   --baseline-commit 208a07e19ef4e50461a2a89c94378bd64649ff7e erpnext/accounts/doctype/bank_*
 python .github/helper/postgres_compat.py $(git diff --name-only 208a07e19e 3ed4ea28fb -- '*.py')
 ```
 
-`<frappe-semgrep-rules>` is a checkout of Frappe's semgrep rule set.
+`FRAPPE_SEMGREP_RULES` is the absolute path to a checkout of Frappe's semgrep rule set; the block reads it after `cd erpnext`.
 
 ## 7.4 Confinement Checks — From the Superproject Root
 
