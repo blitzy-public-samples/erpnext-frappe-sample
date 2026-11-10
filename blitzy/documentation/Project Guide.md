@@ -588,3 +588,7 @@ No secret, credential or connection string is read by the workspace. Database an
 | Per-file failure indicator | The red state on an import row, held for the session because the import log persists no error field |
 | Currency advisory | The amber badge shown when a transaction's currency differs from its bank account's. Advisory only — it never disables confirm |
 | Acceptance gate | Install, type check, lint and the coverage run — the four commands that must pass before a change lands |
+
+## H. PR Walkthrough
+
+A reviewer's guided tour of this pull request — review order, area-by-area rationale, requirement traceability and the complete changed-path inventory — is in [PR Walkthrough](PR%20Walkthrough.md), beside this guide.
