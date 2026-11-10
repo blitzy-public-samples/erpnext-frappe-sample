@@ -4,7 +4,7 @@
 
 This is a reviewer's guided tour of the pull request that completes and hardens the ERPNext Bank Reconciliation single-page application at `erpnext/banking/` and the bank DocType controllers it calls. For each area of the diff it states what changed, why, where to look, what deserves scrutiny and how to check the claim yourself.
 
-- **Status, effort and open items** are in the [Project Guide](Project%20Guide.md). This walkthrough carries none of them.
+- **Status, effort and open items** are in the [Project Guide](Project%20Guide.md). This walkthrough carries no status or effort figures; the only open items it names are three the Guide does not record — the desktop-only gate divergence and two skip-link defects — in §4.4 Scrutinise, and §6 repeats the gate divergence.
 - **The operating runbook** — install, test, build, run and troubleshoot — is the workspace README, `erpnext/banking/README.md`.
 - **Requirement identifiers** come from the Agent Action Plan (AAP) that scoped the work. §1.3 defines them; §5 states every FM, TC and SC in full.
 
@@ -225,7 +225,7 @@ CI=true npx vitest run src/components/features/BankReconciliation \
   - Realtime progress is read as a percentage, and the row count is shown only from the terminal event.
   - The dialog is mounted here.
 - **`pages/BankStatementImporter.tsx`.**
-  - Each Previous Imports row now shows one of three states: green `Completed`, solid red `Failed` from the failure map, or grey otherwise. An authoritative `Completed` wins, and stale markers are pruned against the rows the list returns.
+  - Each Previous Imports row now shows one of three states. The server's `Completed` wins and shows green. Otherwise the row shows solid red `Failed` when a refusal is recorded for it in `bankRecImportFailuresAtom` or the server reports zero parsed transactions (`number_of_transactions === 0`), and its tooltip names the cause. Every other row shows its stored status in grey. The zero-transaction branch is derived from the row the server returns, so it survives a reload without any marker. A marker is pruned once the list reports its row `Completed`; a marker for a row outside the fetched page is kept.
   - A refusal that happened before any import log existed is marked on the upload form through `bankRecUploadRefusalsAtom`.
   - The inline banner is suppressed while the dialog reports the same error object.
   - The dialog is mounted here too, because this page is a separate route tree.
@@ -252,7 +252,7 @@ CI=true npx vitest run src/components/features/BankReconciliation \
 
 **Scrutinise**
 
-- **No client-side transaction creation.** The only write is the server's import call.
+- **No client-side transaction creation.** Only the server's `insert_transactions` call creates Bank Transactions; the client never synthesises one. The importer does write other records. The upload step saves a protected PDF's password as `statement_password` on the Bank Account, uploads the statement as a `File`, creates the `Bank Statement Import Log`, and best-effort deletes its placeholder `File` attachment on both success and refusal. The review step's header-row, column-mapping and PDF-table edits save the import log through server methods.
 - **Server status outranks a marker.** `Completed` always wins.
 - **Two refusal stages.** A refusal after the log exists marks its row; a refusal before any log exists marks the upload form.
 - **Marker lifetime.** The Project Guide's §1.4 and §6 rows describe a hard reload returning a refused row to "Not Started", while §5.2 row 4 and `bankRecAtoms.ts` persist the marker map in `sessionStorage`. Confirm the behaviour in a browser.
@@ -273,7 +273,7 @@ CI=true npx vitest run src/components/features/BankStatementImporter \
 - **Application shell.**
   - `src/App.tsx` wraps the router in `ErrorBoundary` with an `AppRenderFailure` fallback, and mounts `SkipToContent`. The catch-all route becomes `<Navigate to="/" replace />`, so an unknown URL is replaced in history rather than left behind for Back to return to.
   - New components: `components/common/ErrorBoundary.tsx`, `components/common/AppRenderFailure.tsx` and `components/common/PageShell.tsx` (`SkipToContent`, `MainContent`).
-  - `pages/BankReconciliation.tsx` measures its header to size the tab panels.
+  - `pages/BankReconciliation.tsx` measures its header to size the tab panels. It also moves the desktop-only gate from `md:flex hidden` / `md:hidden` (768 px) to `sm:flex pointer-fine:flex hidden` / `sm:hidden pointer-fine:hidden` (640 px, or any fine pointer); see Scrutinise.
 - **Design-system primitives.** 21 of the 43 modules in `src/components/ui/` are modified, and none is added:
   - `markdown.tsx` sanitises server markup after `rehypeRaw`, with an element allowlist, a `DROPPED_SUBTREES` set and an attribute allowlist;
   - `error-banner.tsx` gains an optional dismiss;
@@ -287,13 +287,13 @@ CI=true npx vitest run src/components/features/BankStatementImporter \
   - `lib/frappe.ts` detects a transport failure while parsing messages and adds `makeClientRefusal`.
   - `lib/numbers.ts` adds `parseCurrencyInput` and `currencyInputValueToNumber` for strict amount parsing.
   - `lib/utils.ts` adds `TARGET_MIN_SIZE`.
-- **Tokens.** `src/index.css` changes the values of four existing tokens in both themes — `--ink-gray-5`, `--ink-red-3`, `--ink-red-4` and `--focus-shadow-gray`. It introduces no new custom property.
+- **Tokens.** `src/index.css` changes the values of three existing tokens in both themes — `--ink-gray-5`, `--ink-red-3` and `--focus-shadow-gray` — and of `--ink-red-4` in the dark theme only, where it moves from `var(--red-300)` to `var(--red-100)`; the light theme keeps `var(--red-700)`. It introduces no new custom property.
 
 **Why**
 
 - **Gap D2.** The dialog composes the existing alert dialog and error banner, and refusals are parsed through the single shared path in `lib/frappe.ts` (AAP §0.2.10).
 - **The sanitiser.** Every refusal renders server text through `markdown.tsx`, which makes the sanitiser the trust boundary.
-- **Divergences.** The robustness, layout and accessibility edits here are part of Project Guide §5.2 row 1. The design system's solid brand colours are deliberately unchanged — row 8.
+- **Divergences.** The robustness, layout and accessibility edits here are part of Project Guide §5.2 row 1, except the desktop-only gate change: it departs from AAP §0.8.5.3, and no §5.2 row records it (see Scrutinise). The design system's solid brand colours are deliberately unchanged — row 8.
 
 **Key files**
 
@@ -310,6 +310,19 @@ CI=true npx vitest run src/components/features/BankStatementImporter \
 - **Primitives are shared.** Each primitive edit reaches every consumer, so read it as a change to all of them.
 - **Token values.** These changes recolour existing text and focus rings everywhere. `erpnext/banking/src/test/design-tokens.test.ts` reads the real stylesheet and asserts WCAG contrast ratios for them.
 - **The README's frozen list.** Its "Intentionally unchanged files" list names `index.html`, `src/index.css`, everything under `src/components/ui/`, and `src/lib/frappe.ts` as frozen, yet all of them appear in this diff. The README acknowledges the primitive and stylesheet edits in its "Scope boundaries" row and marks `markdown.tsx` as modified; the `index.html` and `src/lib/frappe.ts` edits are not acknowledged there.
+- **The desktop-only gate moved — a human decision.** AAP §0.8.5.3 says the reconciliation page's desktop-only breakpoint behaviour "is preserved unchanged". Project Guide §5.2 does not list this change.
+  - In `pages/BankReconciliation.tsx`, the workbench container (L136) carries `sm:flex pointer-fine:flex hidden` and the notice (L215) carries `sm:hidden pointer-fine:hidden`. At `208a07e19e` they carried `md:flex hidden` (L42) and `md:hidden` (L80).
+  - Effect: from 640 to 767 px with any pointer, and below 640 px with a fine pointer, the full workbench renders where the base showed "This screen is not supported on mobile devices." The comment at L107–135 gives the reason: a 768 px gate hid the workbench at 200 % browser zoom on a 1440 px display.
+  - `pages/BankReconciliation.test.tsx` "keeps the workbench visible at 200% zoom, by width and by pointer type" pins the new classes and asserts that `md:flex` and `md:hidden` are absent.
+  - The README's "Performance limits measured against a running site" row 12 still quotes `md:flex hidden` and calls the gate "preserved unchanged".
+  - Decide: restore the `md` gate and update that test, or record the 200 % zoom change as a divergence.
+- **The skip link loses focus when the notice shows — an open defect.** `src/App.tsx` mounts `SkipToContent` on every route. Its target, `main#banking-main-content` (`MainContent`, `tabIndex={-1}`), sits inside the L136 workbench container, which is `display:none` below 640 px without a fine pointer.
+  - Measured at 375 × 812: Tab focuses "Skip to main content", and Enter adds `#banking-main-content` to the address but leaves `document.activeElement` on `<body>`. The next Tab reaches "Go to Desktop".
+  - At 1440 × 900, Enter focuses the `main` element as intended.
+  - This diff does not fix it. Remedy: offer the link only when its target renders, either with the same `sm:` / `pointer-fine:` visibility or by rendering it only with the workbench.
+- **The focused skip link has no padding — an open defect.** In `components/common/PageShell.tsx` (L25) the link carries `px-4 py-2`, but `focus-visible:not-sr-only` resets padding to 0 and, as a variant utility, overrides them.
+  - Measured at 1440 × 900: the focused link is a 135.5 × 21 px box with 0 px computed padding, drawn over the "Banking Beta" breadcrumb, whose text shows beneath and beside it.
+  - This diff does not fix it. Remedy: `focus-visible:px-4 focus-visible:py-2`.
 
 **Verify**
 
@@ -527,6 +540,8 @@ The table restates Project Guide §5.2 rows 1–8 and points to where each shows
 | 8 | Accessible contrast on interactive controls | Six solid-control colour pairs measure below 4.5:1; the design system's brand colours are unchanged | §4.4, `erpnext/banking/src/index.css` |
 
 **Read row 6 alongside the code.** The guide's narrative states that posting saves an already-submitted document, so the currency validation does not run on that path. At `3ed4ea28fb`, however, `before_update_after_submit` in `bank_transaction.py` calls `validate_currency()`, and `test_reconcile_refuses_a_currency_mismatch` asserts that `reconcile_vouchers` refuses a mismatch; the README's FM5 row describes the same enforcement. Settle which statement holds before relying on either.
+
+**One departure the Guide does not list.** `pages/BankReconciliation.tsx` moves the reconciliation page's desktop-only gate from `md` (768 px) to `sm` (640 px) or a fine pointer, while AAP §0.8.5.3 keeps that behaviour unchanged. No Project Guide §5.2 row records it, so the table above leaves it out. It awaits a human decision; see §4.4 Scrutinise.
 
 # 7. How to Verify Locally
 
