@@ -4,7 +4,7 @@
 
 This is a reviewer's guided tour of the pull request that completes and hardens the ERPNext Bank Reconciliation single-page application at `erpnext/banking/` and the bank DocType controllers it calls. For each area of the diff it states what changed, why, where to look, what deserves scrutiny and how to check the claim yourself.
 
-- **Status, effort and open items** are in the [Project Guide](Project%20Guide.md). This walkthrough carries no status or effort figures; the only open items it names are three the Guide does not record — the desktop-only gate divergence and two skip-link defects — in §4.4 Scrutinise, and §6 repeats the gate divergence.
+- **Status, effort and open items** are in the [Project Guide](Project%20Guide.md). This walkthrough carries no status or effort figures; the only open defects or human decisions it names that the Guide does not record are three — the desktop-only gate divergence and two skip-link defects — in §4.4 Scrutinise, with §6 repeating the gate divergence. It also flags documentation discrepancies, Guide or README statements for the reviewer to settle against the code: §4.1 (the Guide's HTTP 508 concurrency note against the row lock), §4.3 (marker lifetime), §4.4 (the README's frozen-file list and its performance-limits row 12), §4.8 (the README's figures and claims) and §6 (Guide row 6).
 - **The operating runbook** — install, test, build, run and troubleshoot — is the workspace README, `erpnext/banking/README.md`.
 - **Requirement identifiers** come from the Agent Action Plan (AAP) that scoped the work. §1.3 defines them; §5 states every FM, TC and SC in full.
 
@@ -149,9 +149,13 @@ for m in bank_transaction bank_reconciliation_tool bank_transaction_rule \
 done
 # Measured: 21, 46, 31, 26, 10 — 134 tests, OK, on MariaDB and again on PostgreSQL
 
-# The guard count per controller (18, 6, 3, 1), read from the erpnext app checkout inside the bench
+# The guard count per guarded controller, read from the erpnext app checkout inside the bench
+# Prints 18, 6, 3 and 1, in this order — 28 in total; bank_account.py carries none
 cd "${BENCH_ROOT:?Set BENCH_ROOT to your bench directory}/apps/erpnext"
-grep -c '^@refuse_missing_arguments' erpnext/accounts/doctype/bank_*/bank_*.py
+grep -c '^@refuse_missing_arguments' erpnext/accounts/doctype/bank_reconciliation_tool/bank_reconciliation_tool.py \
+                                     erpnext/accounts/doctype/bank_statement_import_log/bank_statement_import_log.py \
+                                     erpnext/accounts/doctype/bank_transaction/bank_transaction.py \
+                                     erpnext/accounts/doctype/bank_transaction_rule/bank_transaction_rule.py
 ```
 
 ## 4.2 Reconciliation Workbench (27 files)
@@ -223,6 +227,7 @@ CI=true npx vitest run src/components/features/BankReconciliation \
   - Attempt tracking ignores a stale response.
   - A statement with no readable transactions shows a refusal banner built with `makeClientRefusal` in place of the Import prompt.
   - Realtime progress is read as a percentage, and the row count is shown only from the terminal event.
+  - The statement totals (debits, credits, closing balance) and the withdrawal and deposit of each transaction to be imported are now formatted with `data.doc.currency` instead of the always-undefined `data.currency`. Conflicting-transaction rows keep their own `transaction.currency`.
   - The dialog is mounted here.
 - **`pages/BankStatementImporter.tsx`.**
   - Each Previous Imports row now shows one of three states. The server's `Completed` wins and shows green. Otherwise the row shows solid red `Failed` when a refusal is recorded for it in `bankRecImportFailuresAtom` or the server reports zero parsed transactions (`number_of_transactions === 0`), and its tooltip names the cause. Every other row shows its stored status in grey. The zero-transaction branch is derived from the row the server returns, so it survives a reload without any marker. A marker is pruned once the list reports its row `Completed`; a marker for a row outside the fetched page is kept.
@@ -230,7 +235,7 @@ CI=true npx vitest run src/components/features/BankReconciliation \
   - The inline banner is suppressed while the dialog reports the same error object.
   - The dialog is mounted here too, because this page is a separate route tree.
 - **Smaller edits:**
-  - `import_utils.ts` reads the statement currency from `data.doc.currency`;
+  - `import_utils.ts` drops the phantom top-level `currency` from `GetStatementDetailsResponse` — the statement's currency lives on `doc.currency` — and documents `pdf_tables` as PDF-only;
   - `CSV/CSVImport.tsx` and `PDF/PDFImport.tsx` stack their panes below `xl`;
   - `PDF/PDFTableEditor.tsx` names its page-stepping controls and announces the page with `role="status"`;
   - `RawTableGrid.tsx` moves its highlight colours onto design-system surface tokens;
@@ -433,15 +438,15 @@ CI=true npx vitest run --sequence.shuffle --sequence.seed=1   # Measured: 62 fil
 | `src/test` (`design-tokens.test.ts`) | 1 | 16 |
 | **Total** | **62** | **1,521** |
 
-The mandated scenarios and failure modes are labelled in the `describe` names; `grep -rnE "describe\(.*(TC[1-6]|FM[1-5])" src` lists all 13 labelled blocks:
+The mandated scenarios and failure modes are labelled in the `describe` names; `grep -rnE "describe\(.*(TC[1-6]|FM[1-5])" src` lists all 13 labelled blocks — 6 in `MatchAndReconcile.test.tsx`, 1 in `utils.test.ts`, 3 in `CSV/StatementDetails.test.tsx` and 3 in `pages/BankStatementImporter.test.tsx`. The "Also read" column names unlabelled blocks that also prove a scenario:
 
-| Suite | Labelled blocks |
-| --- | --- |
-| `MatchAndReconcile.test.tsx` (116 tests) | `TC1 - the unreconciled list` (including the FM4 case "renders each row exactly as the backend produced it, with no client-side deduplication"), `TC2 - the rule-suggested match`, `TC3 - a manual override to a different voucher`, `TC4 - confirming a match posts the reconciliation`, `TC5 and FM3 - an already-reconciled transaction cannot be reconciled again`, `FM5 - a currency mismatch warns without blocking` |
-| `utils.test.ts` (115 tests) | `useReconcileTransaction — the accepted post (TC4)`, `a refused post leaves the client's state exactly as it was` |
-| `BankRecErrorDialog.test.tsx` (49 tests) | The server's own words across every envelope path, severity, structure, focus management, dismissal |
-| `CSV/StatementDetails.test.tsx` (59 tests) | `TC1 — the parsed statement is presented for review`, `TC1 — importing posts one server-side operation and follows its answer`, `FM2 — a refused import surfaces the backend error and creates nothing` |
-| `pages/BankStatementImporter.test.tsx` (101 tests) | `previous imports list (TC1)`, `per-row status chip (FM2)`, `a statement the server cannot read is refused before any log exists (FM2)` |
+| Suite | Labelled blocks | Also read |
+| --- | --- | --- |
+| `MatchAndReconcile.test.tsx` (116 tests) | `TC1 - the unreconciled list` (including the FM4 case "renders each row exactly as the backend produced it, with no client-side deduplication"), `TC2 - the rule-suggested match`, `TC3 - a manual override to a different voucher`, `TC4 - confirming a match posts the reconciliation`, `TC5 and FM3 - an already-reconciled transaction cannot be reconciled again`, `FM5 - a currency mismatch warns without blocking` | — |
+| `utils.test.ts` (115 tests) | `useReconcileTransaction — the accepted post (TC4)` | `a refused post leaves the client's state exactly as it was` |
+| `BankRecErrorDialog.test.tsx` (49 tests) | — | The server's own words across every envelope path, severity, structure, focus management, dismissal |
+| `CSV/StatementDetails.test.tsx` (59 tests) | `TC1 — the parsed statement is presented for review`, `TC1 — importing posts one server-side operation and follows its answer`, `FM2 — a refused import surfaces the backend error and creates nothing` | — |
+| `pages/BankStatementImporter.test.tsx` (101 tests) | `previous imports list (TC1)`, `per-row status chip (FM2)`, `a statement the server cannot read is refused before any log exists (FM2)` | — |
 
 **Why**
 
